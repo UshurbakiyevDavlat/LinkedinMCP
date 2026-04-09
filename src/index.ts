@@ -78,23 +78,22 @@ Examples:
   },
   async ({ response_format }) => {
     try {
-      // /v2/me works with r_profile_basicinfo scope (from "Share on LinkedIn" product)
-      // LinkedIn-Version header is now included in v2Headers()
-      const profile = await v2Request<LinkedInProfile>(
-        "me?projection=(id,localizedFirstName,localizedLastName,localizedHeadline,vanityName)"
-      );
+      // /v2/userinfo — OIDC endpoint, works with openid + profile scopes
+      const userInfo = await oidcUserInfo();
 
       if (response_format === ResponseFormat.JSON) {
-        return { content: [{ type: "text", text: JSON.stringify(profile, null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify(userInfo, null, 2) }] };
       }
 
       const lines = [
         `# LinkedIn Profile`,
         ``,
-        `**Name**: ${profile.localizedFirstName} ${profile.localizedLastName}`,
-        `**ID**: ${profile.id}`,
-        profile.localizedHeadline ? `**Headline**: ${profile.localizedHeadline}` : "",
-        profile.vanityName ? `**Vanity URL**: linkedin.com/in/${profile.vanityName}` : "",
+        `**Name**: ${userInfo.name}`,
+        `**First Name**: ${userInfo.given_name}`,
+        `**Last Name**: ${userInfo.family_name}`,
+        userInfo.email ? `**Email**: ${userInfo.email}` : "",
+        `**ID**: ${userInfo.sub}`,
+        userInfo.picture ? `**Photo**: ${userInfo.picture}` : "",
       ].filter(Boolean);
       return { content: [{ type: "text", text: lines.join("\n") }] };
     } catch (error) {
