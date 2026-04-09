@@ -33,6 +33,31 @@ function restHeaders(): Record<string, string> {
   };
 }
 
+// OpenID Connect userinfo endpoint (/v2/userinfo)
+// Use for profile info in apps with "Sign In with LinkedIn using OpenID Connect"
+export async function oidcUserInfo(): Promise<{
+  sub: string;
+  name: string;
+  given_name: string;
+  family_name: string;
+  picture?: string;
+  email?: string;
+}> {
+  const response = await axios.get("https://api.linkedin.com/v2/userinfo", {
+    headers: {
+      Authorization: `Bearer ${getAccessToken()}`,
+    },
+    timeout: 30000,
+  });
+  return response.data;
+}
+
+// REST /me endpoint — returns person ID and basic profile (needed for post author URN)
+export async function restMe(): Promise<{ id: string; localizedFirstName?: string; localizedLastName?: string; localizedHeadline?: string; vanityName?: string }> {
+  const res = await restRequest<{ id: string; localizedFirstName?: string; localizedLastName?: string; localizedHeadline?: string; vanityName?: string }>("me");
+  return res.data;
+}
+
 // Generic request helper for v2 API
 export async function v2Request<T>(
   endpoint: string,
