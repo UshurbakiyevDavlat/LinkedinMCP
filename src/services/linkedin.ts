@@ -18,6 +18,7 @@ function v2Headers(): Record<string, string> {
   return {
     Authorization: `Bearer ${getAccessToken()}`,
     "Content-Type": "application/json",
+    "LinkedIn-Version": LINKEDIN_VERSION,
     "X-Restli-Protocol-Version": "2.0.0",
   };
 }
