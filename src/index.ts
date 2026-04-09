@@ -769,15 +769,19 @@ async function main() {
           return;
         }
 
-        // Buffer the body and pass it to the transport
-        const chunks: Buffer[] = [];
-        req.on("data", (chunk: Buffer) => chunks.push(chunk));
-        req.on("end", async () => {
-          const body = Buffer.concat(chunks).toString();
-          // Temporarily parse body for the transport
-          (req as any).body = JSON.parse(body);
-          await transport.handlePostMessage(req as any, res as any);
+        // Pass raw req directly — SDK reads the body stream itself
+        await transport.handlePostMessage(req, res);
+        return;
+      }
+
+      // ── CORS preflight ────────────────────────────────────────────────────
+      if (req.method === "OPTIONS") {
+        res.writeHead(204, {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
         });
+        res.end();
         return;
       }
 
