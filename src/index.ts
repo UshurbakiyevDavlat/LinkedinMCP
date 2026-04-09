@@ -78,20 +78,23 @@ Examples:
   },
   async ({ response_format }) => {
     try {
-      // Use REST /me — works with profile / r_profile_basicinfo scope
-      const me = await restMe();
+      // /v2/me works with r_profile_basicinfo scope (from "Share on LinkedIn" product)
+      // LinkedIn-Version header is now included in v2Headers()
+      const profile = await v2Request<LinkedInProfile>(
+        "me?projection=(id,localizedFirstName,localizedLastName,localizedHeadline,vanityName)"
+      );
 
       if (response_format === ResponseFormat.JSON) {
-        return { content: [{ type: "text", text: JSON.stringify(me, null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify(profile, null, 2) }] };
       }
 
       const lines = [
         `# LinkedIn Profile`,
         ``,
-        `**Name**: ${me.localizedFirstName ?? ""} ${me.localizedLastName ?? ""}`.trim(),
-        `**ID**: ${me.id}`,
-        me.localizedHeadline ? `**Headline**: ${me.localizedHeadline}` : "",
-        me.vanityName ? `**Vanity URL**: linkedin.com/in/${me.vanityName}` : "",
+        `**Name**: ${profile.localizedFirstName} ${profile.localizedLastName}`,
+        `**ID**: ${profile.id}`,
+        profile.localizedHeadline ? `**Headline**: ${profile.localizedHeadline}` : "",
+        profile.vanityName ? `**Vanity URL**: linkedin.com/in/${profile.vanityName}` : "",
       ].filter(Boolean);
       return { content: [{ type: "text", text: lines.join("\n") }] };
     } catch (error) {
@@ -279,7 +282,7 @@ Examples:
   async ({ text, visibility, image_urn, image_title }) => {
     try {
       // Get the user's person URN first
-      const me = await restMe();
+      const me = await v2Request<LinkedInProfile>("me");
       const authorUrn = `urn:li:person:${me.id}`;
 
       const body: Record<string, unknown> = {
@@ -477,7 +480,7 @@ Examples:
       const imageBuffer = fs.readFileSync(file_path);
 
       // Get user URN
-      const me = await restMe();
+      const me = await v2Request<LinkedInProfile>("me");
       const personUrn = `urn:li:person:${me.id}`;
 
       const imageUrn = await uploadImage(personUrn, imageBuffer, mimeType);
@@ -652,7 +655,7 @@ Examples:
     try {
       let personUrn = author_urn;
       if (!personUrn) {
-        const me = await restMe();
+        const me = await v2Request<LinkedInProfile>("me");
         personUrn = `urn:li:person:${me.id}`;
       }
 
