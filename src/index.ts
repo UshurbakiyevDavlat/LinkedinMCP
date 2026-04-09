@@ -16,8 +16,10 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { z } from "zod";
 import fs from "fs";
+import http from "http";
 
 import { v2Request, restRequest, handleApiError, uploadImage } from "./services/linkedin.js";
 import { ResponseFormat, POST_MAX_LENGTH } from "./constants.js";
@@ -724,9 +726,86 @@ async function main() {
     process.exit(1);
   }
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("LinkedIn MCP server running via stdio");
+  const transportMode = process.env.MCP_TRANSPORT ?? "stdio";
+
+  if (transportMode === "sse") {
+    // ── SSE / HTTP mode (for VPS / remote access) ──────────────────────────
+    const PORT = parseInt(process.env.PORT ?? "3100", 10);
+    const AUTH_TOKEN = process.env.MCP_AUTH_TOKEN; // optional token guard
+
+    const activeSessions: Record<string, SSEServerTransport> = {};
+
+    const httpServer = http.createServer(async (req, res) => {
+      const url = new URL(req.url!, `http://localhost:${PORT}`);
+
+      // ── GET /sse — open SSE stream ────────────────────────────────────────
+      if (req.method === "GET" && url.pathname === "/sse") {
+        // Token check (if MCP_AUTH_TOKEN is set)
+        if (AUTH_TOKEN && url.searchParams.get("token") !== AUTH_TOKEN) {
+          res.writeHead(401, { "Content-Type": "text/plain" });
+          res.end("Unauthorized");
+          return;
+        }
+
+        const transport = new SSEServerTransport("/messages", res);
+        activeSessions[transport.sessionId] = transport;
+
+        req.on("close", () => {
+          delete activeSessions[transport.sessionId];
+        });
+
+        await server.connect(transport);
+        return;
+      }
+
+      // ── POST /messages — client → server messages ─────────────────────────
+      if (req.method === "POST" && url.pathname === "/messages") {
+        const sessionId = url.searchParams.get("sessionId") ?? "";
+        const transport = activeSessions[sessionId];
+
+        if (!transport) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Session not found" }));
+          return;
+        }
+
+        // Buffer the body and pass it to the transport
+        const chunks: Buffer[] = [];
+        req.on("data", (chunk: Buffer) => chunks.push(chunk));
+        req.on("end", async () => {
+          const body = Buffer.concat(chunks).toString();
+          // Temporarily parse body for the transport
+          (req as any).body = JSON.parse(body);
+          await transport.handlePostMessage(req as any, res as any);
+        });
+        return;
+      }
+
+      // ── Health check ──────────────────────────────────────────────────────
+      if (req.method === "GET" && url.pathname === "/health") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "ok", service: "linkedin-mcp-server" }));
+        return;
+      }
+
+      res.writeHead(404, { "Content-Type": "text/plain" });
+      res.end("Not found");
+    });
+
+    httpServer.listen(PORT, () => {
+      console.error(`LinkedIn MCP server running in SSE mode on port ${PORT}`);
+      console.error(`  SSE endpoint:  http://localhost:${PORT}/sse`);
+      console.error(`  Health check:  http://localhost:${PORT}/health`);
+      if (AUTH_TOKEN) {
+        console.error(`  Auth token:    set (use ?token=... query param)`);
+      }
+    });
+  } else {
+    // ── stdio mode (default — for local Claude Desktop) ───────────────────
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error("LinkedIn MCP server running via stdio");
+  }
 }
 
 main().catch((error) => {

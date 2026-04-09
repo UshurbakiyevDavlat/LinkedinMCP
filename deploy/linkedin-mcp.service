@@ -1,0 +1,17 @@
+[Unit]
+Description=LinkedIn MCP Server (SSE)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/linkedin-mcp-server
+EnvironmentFile=/opt/linkedin-mcp-server/.env
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
