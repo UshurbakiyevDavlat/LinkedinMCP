@@ -280,9 +280,9 @@ Examples:
   },
   async ({ text, visibility, image_urn, image_title }) => {
     try {
-      // Get the user's person URN first
-      const me = await v2Request<LinkedInProfile>("me");
-      const authorUrn = `urn:li:person:${me.id}`;
+      // Get the user's person URN via OIDC userinfo (works with openid + profile scopes)
+      const userInfo = await oidcUserInfo();
+      const authorUrn = `urn:li:person:${userInfo.sub}`;
 
       const body: Record<string, unknown> = {
         author: authorUrn,
@@ -478,9 +478,9 @@ Examples:
 
       const imageBuffer = fs.readFileSync(file_path);
 
-      // Get user URN
-      const me = await v2Request<LinkedInProfile>("me");
-      const personUrn = `urn:li:person:${me.id}`;
+      // Get user URN via OIDC userinfo
+      const userInfo = await oidcUserInfo();
+      const personUrn = `urn:li:person:${userInfo.sub}`;
 
       const imageUrn = await uploadImage(personUrn, imageBuffer, mimeType);
 
@@ -654,8 +654,8 @@ Examples:
     try {
       let personUrn = author_urn;
       if (!personUrn) {
-        const me = await v2Request<LinkedInProfile>("me");
-        personUrn = `urn:li:person:${me.id}`;
+        const userInfo = await oidcUserInfo();
+        personUrn = `urn:li:person:${userInfo.sub}`;
       }
 
       const params: Record<string, unknown> = {
