@@ -78,22 +78,20 @@ Examples:
   },
   async ({ response_format }) => {
     try {
-      // Use OIDC /v2/userinfo — works with "Sign In with LinkedIn using OpenID Connect"
-      const userInfo = await oidcUserInfo();
+      // Use REST /me — works with profile / r_profile_basicinfo scope
+      const me = await restMe();
 
       if (response_format === ResponseFormat.JSON) {
-        return { content: [{ type: "text", text: JSON.stringify(userInfo, null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify(me, null, 2) }] };
       }
 
       const lines = [
         `# LinkedIn Profile`,
         ``,
-        `**Name**: ${userInfo.name}`,
-        `**First Name**: ${userInfo.given_name}`,
-        `**Last Name**: ${userInfo.family_name}`,
-        `**Email**: ${userInfo.email ?? "—"}`,
-        `**Sub (ID)**: ${userInfo.sub}`,
-        userInfo.picture ? `**Photo**: ${userInfo.picture}` : "",
+        `**Name**: ${me.localizedFirstName ?? ""} ${me.localizedLastName ?? ""}`.trim(),
+        `**ID**: ${me.id}`,
+        me.localizedHeadline ? `**Headline**: ${me.localizedHeadline}` : "",
+        me.vanityName ? `**Vanity URL**: linkedin.com/in/${me.vanityName}` : "",
       ].filter(Boolean);
       return { content: [{ type: "text", text: lines.join("\n") }] };
     } catch (error) {
